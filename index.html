@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل زيارات</title>
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css"
+        integrity="sha384-AYmEC3Yw5cVb3ZcuHtOA93w35dYTsvhLPVnYs9eStHfGJvOvKxVfELGroGkvsg+p" crossorigin="anonymous" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <link rel="stylesheet" href="./sweetalert2.min.css">
+</head>
+
+<body>
+    <div class="add-visit">
+        <div class="container">
+            <h1>تسجيل الزيارات</h1>
+            <form id="visitForm">
+                <div class="mb-3">
+                    <label for="customerName">اسم الزبون</label>
+                    <input class="inputs form-control" type="text" id="customerName" placeholder="اسم الزبون">
+                </div>
+                <div class="mb-3">
+                    <label for="dateVisit">تاريخ الزيارة</label>
+                    <input class="inputs form-control" type="date" id="dateVisit" placeholder="تاريخ الزيارة">
+                </div>
+                <div class="mb-3">
+                    <label for="timeVisit">مدة الزيارة</label>
+                    <input class="inputs form-control" type="number" id="timeVisit" placeholder="مدة الزيارة">
+                </div>
+                <div class="mb-3">
+                    <label for="visitDescription">ملخص الزيارة</label>
+                    <textarea class="inputs form-control" id="visitDescription"
+                        placeholder="ملخص الزيارة"></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-secondary mt-4 p-2" id="submitBtn">اضافة زيارة</button>
+                <button type="button" class="btn btn-outline-info mt-4 p-2" id="updateBtn"
+                    style="display: none;">تحديث الزيارة</button>
+                <button type="reset" class="btn btn-outline-secondary mt-4 p-2">مسح</button>
+            </form>
+        </div>
+        <div class="container">
+            <input type="search" placeholder="ابحث هنا..." id="search" class="form-control my-3">
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>اسم الزبون</th>
+                        <th>تاريخ الزيارة</th>
+                        <th>مدة الزيارة</th>
+                        <th>ملخص الزيارة</th>
+                        <th>تعديل</th>
+                        <th>حذف</th>
+                    </tr>
+                </thead>
+                <tbody id="data"></tbody>
+            </table>
+            <button id="deleteAllBtn" class="btn btn-outline-danger text-center my-3">حذف الكل</button>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <script>
+        var visits = [];
+
+        // Function to fetch visits from API
+        function fetchVisits() {
+            fetch('https://itqan-online.com/apps/test-visits/index.html')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); // Assuming API returns JSON data
+                })
+                .then(data => {
+                    visits = data; // Assign fetched data to visits array
+                    displayVisits(); // Display fetched visits
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'خطأ في جلب البيانات',
+                        text: 'يرجى المحاولة مرة أخرى',
+                    });
+                });
+        }
+
+        // Function to add a visit
+        function addVisit() {
+            var customerName = document.getElementById("customerName").value;
+            var dateVisit = document.getElementById("dateVisit").value;
+            var timeVisit = document.getElementById("timeVisit").value;
+            var visitDescription = document.getElementById("visitDescription").value;
+
+            var visit = {
+                customerName: customerName,
+                dateVisit: dateVisit,
+                timeVisit: timeVisit,
+                visitDescription: visitDescription
+            };
+
+            visits.push(visit); // Add visit to visits array
+            displayVisits(); // Display updated visits
+            resetForm(); // Reset form fields
+
+            saveVisitsToLocalStorage(); // Save visits to localStorage
+        }
+
+        // Function to display visits in table
+        function displayVisits() {
+            var tableBody = document.getElementById('data');
+            var tableContent = '';
+
+            visits.forEach((visit, index) => {
+                tableContent += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${visit.customerName}</td>
+                        <td>${visit.dateVisit}</td>
+                        <td>${visit.timeVisit}</td>
+                        <td>${visit.visitDescription}</td>
+                        <td><button class="btn btn-info" onclick="updateVisit(${index})">تعديل</button></td>
+                        <td><button class="btn btn-danger" onclick="confirmDeleteVisit(${index})">حذف</button></td>
+                    </tr>`;
+            });
+
+            tableBody.innerHTML = tableContent;
+        }
+
+        // Function to update visit
+        function updateVisit(index) {
+            var visit = visits[index];
+            document.getElementById('customerName').value = visit.customerName;
+            document.getElementById('dateVisit').value = visit.dateVisit;
+            document.getElementById('timeVisit').value = visit.timeVisit;
+            document.getElementById('visitDescription').value = visit.visitDescription;
+
+            document.getElementById('submitBtn').style.display = 'none';
+            document.getElementById('updateBtn').style.display = 'inline';
+            document.getElementById('updateBtn').onclick = function () {
+                saveUpdate(index);
+            };
+        }
+
+        // Function to save updated visit
+        function saveUpdate(index) {
+            var updatedVisit = {
+                customerName: document.getElementById('customerName').value,
+                dateVisit: document.getElementById('dateVisit').value,
+                timeVisit: document.getElementById('timeVisit').value,
+                visitDescription: document.getElementById('visitDescription').value
+            };
+
+            visits[index] = updatedVisit; // Update visit in visits array
+            displayVisits(); // Display updated visits
+            resetForm(); // Reset form fields
+
+            saveVisitsToLocalStorage(); // Save visits to localStorage
+
+            document.getElementById('submitBtn').style.display = 'inline';
+            document.getElementById('updateBtn').style.display = 'none';
+        }
+
+        // Function to delete visit
+        function deleteVisit(index) {
+            visits.splice(index, 1); // Remove visit from visits array
+            displayVisits(); // Display updated visits
+
+            saveVisitsToLocalStorage(); // Save visits to localStorage
+        }
+
+        // Function to confirm delete visit
+        function confirmDeleteVisit(index) {
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: 'لن تتمكن من استرجاع هذه الزيارة!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'نعم، احذفها!',
+                cancelButtonText: 'الغاء'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    deleteVisit(index);
+                    Swal.fire(
+                        'تم الحذف!',
+                        'تم حذف الزيارة بنجاح.',
+                        'success'
+                    );
+                }
+            });
+        }
+
+        // Function to delete all visits
+        document.getElementById('deleteAllBtn').onclick = function () {
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: 'سيتم حذف جميع الزيارات!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'نعم، احذف الكل!',
+                cancelButtonText: 'الغاء'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    visits = []; // Clear visits array
+                    displayVisits(); // Display updated visits
+
+                    saveVisitsToLocalStorage(); // Save visits to localStorage
+
+                    Swal.fire(
+                        'تم الحذف!',
+                        'تم حذف جميع الزيارات بنجاح.',
+                        'success'
+                    );
+                }
+            });
+        };
+
+        // Function to save visits to localStorage
+        function saveVisitsToLocalStorage() {
+            localStorage.setItem('visits', JSON.stringify(visits));
+        }
+
+        // Function to load visits from localStorage on page load
+        function loadVisitsFromLocalStorage() {
+            var storedVisits = localStorage.getItem('visits');
+            if (storedVisits) {
+                visits = JSON.parse(storedVisits);
+                displayVisits();
+            }
+        }
+
+        // Function to reset form fields
+        function resetForm() {
+            document.getElementById('customerName').value = '';
+            document.getElementById('dateVisit').value = '';
+            document.getElementById('timeVisit').value = '';
+            document.getElementById('visitDescription').value = '';
+        }
+
+        // Event listener for form submission
+        document.getElementById('visitForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            addVisit();
+        });
+
+        // Event listener for page load
+        window.addEventListener('load', function () {
+            loadVisitsFromLocalStorage();
+            fetchVisits(); // Fetch visits from API on page load
+        });
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.min.js"
+        integrity="sha384-kjU+l4N0Yf4ZOJErLsIcvOU2qSb74wXpOhqTvwVx3OElZRweTnQ6d31fXEoRD1Jy"
+        crossorigin="anonymous"></script>
+    <script src="./sweetalert2.min.js"></script>
+</body>
+
+</html>
